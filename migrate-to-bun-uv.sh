@@ -92,6 +92,53 @@ for await (const relativePath of packageGlob.scan({ cwd: root, onlyFiles: true }
     await Bun.write(relativePath, JSON.stringify(pkg, null, 4) + '\n')
 }
 
+const componentsPackagePath = 'packages/components/package.json'
+const componentsPackage = await Bun.file(componentsPackagePath).json()
+componentsPackage.scripts.build = 'tsc && bun scripts/copy-icons.ts'
+delete componentsPackage.devDependencies.gulp
+delete componentsPackage.devDependencies['@types/gulp']
+await Bun.write(componentsPackagePath, JSON.stringify(componentsPackage, null, 4) + '\n')
+
+const iconCopyScript = [
+    "import { mkdir } from 'node:fs/promises'",
+    "import { dirname } from 'node:path'",
+    '',
+    "const iconGlob = new Bun.Glob('nodes/**/*.{jpg,png,svg}')",
+    '',
+    "for await (const relativePath of iconGlob.scan({ cwd: process.cwd(), onlyFiles: true })) {",
+    "    const destination = 'dist/' + relativePath",
+    '    await mkdir(dirname(destination), { recursive: true })',
+    '    await Bun.write(destination, Bun.file(relativePath))',
+    '}',
+    ''
+].join('\n')
+await Bun.write('packages/components/scripts/copy-icons.ts', iconCopyScript)
+
+const serverPackagePath = 'packages/server/package.json'
+const serverPackage = await Bun.file(serverPackagePath).json()
+serverPackage.scripts.build = 'tsc && rimraf dist/enterprise/emails && bun scripts/copy-email-templates.ts'
+delete serverPackage.dependencies.gulp
+if (serverPackage.devDependencies) {
+    delete serverPackage.devDependencies.gulp
+    delete serverPackage.devDependencies['@types/gulp']
+}
+await Bun.write(serverPackagePath, JSON.stringify(serverPackage, null, 4) + '\n')
+
+const emailCopyScript = [
+    "import { mkdir } from 'node:fs/promises'",
+    "import { dirname } from 'node:path'",
+    '',
+    "const templateGlob = new Bun.Glob('src/enterprise/emails/*.hbs')",
+    '',
+    "for await (const relativePath of templateGlob.scan({ cwd: process.cwd(), onlyFiles: true })) {",
+    "    const destination = relativePath.replace('src/', 'dist/')",
+    '    await mkdir(dirname(destination), { recursive: true })',
+    '    await Bun.write(destination, Bun.file(relativePath))',
+    '}',
+    ''
+].join('\n')
+await Bun.write('packages/server/scripts/copy-email-templates.ts', emailCopyScript)
+
 async function replaceIn(path, replacements) {
     let text = await Bun.file(path).text()
     for (const [from, to] of replacements) text = text.split(from).join(to)

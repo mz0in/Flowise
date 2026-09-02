@@ -12,8 +12,13 @@
 **/logs
 **/*.log
 
-## pnpm
-.pnpm-store/
+## Bun migration output
+.bun/
+**/bun.lockb
+/bun.lock
+/bunfig.toml
+/packages/components/scripts/copy-icons.ts
+/packages/server/scripts/copy-email-templates.ts
 
 ## build
 **/dist
