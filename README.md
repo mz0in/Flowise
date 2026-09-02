@@ -68,7 +68,7 @@ Use the source-build Compose file so Docker builds the Bun-based server and work
     docker compose -f docker/docker-compose-queue-source.yml stop
     ```
 
-The simpler `docker/docker-compose.yml` pulls the upstream prebuilt image and therefore does not test this fork's Bun migration.
+The migration script rewrites every Compose variant to build the local `flowisezen:local` and `flowisezen-worker:local` Bun images. The queue source file above is the recommended integration test.
 
 ### Docker Image
 
@@ -83,13 +83,13 @@ The migration creates `bun.lock`, updates the Docker and CI configuration, and r
 1. Build the Bun-based image locally:
 
     ```bash
-    docker build --no-cache -t flowise .
+    docker build --no-cache -t flowisezen:local .
     ```
 
 2. Run image:
 
     ```bash
-    docker run -d --name flowise -p 3000:3000 flowise
+    docker run -d --name flowise -p 3000:3000 flowisezen:local
     ```
 
 3. Stop image:

@@ -221,13 +221,54 @@ CMD ["/bin/sh", "-c", "bun /app/healthcheck/healthcheck.js & sleep 5 && bun run 
 `
 await Bun.write('docker/worker/Dockerfile', workerDockerfile)
 
+await replaceIn('docker/docker-compose.yml', [
+    ['        image: flowiseai/flowise:latest', '        image: flowisezen:local\n        build:\n            context: ..\n            dockerfile: Dockerfile'],
+    ['entrypoint: /bin/sh -c "sleep 3; flowise start"', 'entrypoint: /bin/sh -c "sleep 3; bun run --bun start"']
+])
+
+await replaceIn('docker/docker-compose-queue-source.yml', [
+    ['    flowise:\n        container_name: flowise-main', '    flowise:\n        image: flowisezen:local\n        container_name: flowise-main'],
+    ['            dockerfile: docker/Dockerfile', '            dockerfile: Dockerfile'],
+    ['    flowise-worker:\n        container_name: flowise-worker', '    flowise-worker:\n        image: flowisezen-worker:local\n        container_name: flowise-worker']
+])
+
+await replaceIn('docker/docker-compose-queue-prebuilt.yml', [
+    ['        image: flowiseai/flowise:latest', '        image: flowisezen:local\n        build:\n            context: ..\n            dockerfile: Dockerfile'],
+    ['        image: flowiseai/flowise-worker:latest', '        image: flowisezen-worker:local\n        build:\n            context: ..\n            dockerfile: docker/worker/Dockerfile'],
+    ['entrypoint: /bin/sh -c "sleep 3; flowise start"', 'entrypoint: /bin/sh -c "sleep 3; bun run --bun start"'],
+    ['node /app/healthcheck/healthcheck.js & sleep 5 && pnpm run start-worker', 'bun /app/healthcheck/healthcheck.js & sleep 5 && bun run --bun start-worker']
+])
+
+await replaceIn('docker/worker/docker-compose.yml', [
+    ['        image: flowiseai/flowise-worker:latest', '        image: flowisezen-worker:local\n        build:\n            context: ../..\n            dockerfile: docker/worker/Dockerfile'],
+    ['node /app/healthcheck/healthcheck.js & sleep 5 && pnpm run start-worker', 'bun /app/healthcheck/healthcheck.js & sleep 5 && bun run --bun start-worker']
+])
+
 for (const path of [
+    'docker/docker-compose.yml',
+    'docker/docker-compose-queue-source.yml',
     'docker/docker-compose-queue-prebuilt.yml',
     'docker/worker/docker-compose.yml'
 ]) {
     await replaceIn(path, [
-        ['node /app/healthcheck/healthcheck.js & sleep 5 && pnpm run start-worker', 'bun /app/healthcheck/healthcheck.js & sleep 5 && bun run --bun start-worker']
+        ['non-root `node` user, whose home is /home/node', 'non-root `bun` user, whose home is /home/bun'],
+        ['/home/node/.flowise', '/home/bun/.flowise']
     ])
+}
+
+for (const path of [
+    '.github/workflows/docker-image-dockerhub.yml',
+    '.github/workflows/docker-image-ecr.yml'
+]) {
+    let workflow = await Bun.file(path).text()
+    workflow = workflow
+        .replaceAll('node_version', 'bun_version')
+        .replaceAll('NODE_VERSION', 'BUN_VERSION')
+        .replaceAll('Node.js version to build this image with.', 'Bun version to build this image with.')
+        .replace("default: '24'\n                options:\n                    - '20'\n                    - '24'", "default: '" + bunVersion + "'\n                options:\n                    - '" + bunVersion + "'")
+        .replace("default: '24'\n                options:\n                    - '24'", "default: '" + bunVersion + "'\n                options:\n                    - '" + bunVersion + "'")
+        .replaceAll("|| '24'", "|| '" + bunVersion + "'")
+    await Bun.write(path, workflow)
 }
 BUN_SCRIPT
 
@@ -275,5 +316,5 @@ else
 fi
 
 log 'Migration complete. Review the diff, then test with:'
-log '  docker build --no-cache -t flowise-bun .'
-log '  docker build --no-cache -f docker/worker/Dockerfile -t flowise-worker-bun .'
+log '  docker build --no-cache -t flowisezen:local .'
+log '  docker build --no-cache -f docker/worker/Dockerfile -t flowisezen-worker:local .'
