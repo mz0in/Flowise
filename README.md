@@ -36,36 +36,51 @@ English | [繁體中文](./i18n/README-TW.md) | [简体中文](./i18n/README-ZH.
 -   [🙌 Contributing](#-contributing)
 -   [📄 License](#-license)
 
-## ⚡Quick Start
+## ⚡ Quick Start
 
-Download and Install [NodeJS](https://nodejs.org/en/download) >= 20.0.0
+Install [Bun](https://bun.com/docs/installation) 1.4.0 or newer, then start Flowise with the Bun runtime:
 
-1. Install Flowise
-    ```bash
-    npm install -g flowise
-    ```
-2. Start Flowise
+```bash
+bunx --bun flowise start
+```
 
-    ```bash
-    npx flowise start
-    ```
-
-3. Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000).
 
 ## 🐳 Docker
 
 ### Docker Compose
 
-1. Clone the Flowise project
-2. Go to `docker` folder at the root of the project
-3. Copy `.env.example` file, paste it into the same location, and rename to `.env` file
-4. `docker compose up -d`
-5. Open [http://localhost:3000](http://localhost:3000)
-6. You can bring the containers down by `docker compose stop`
+Use the source-build Compose file so Docker builds the Bun-based server and worker images locally:
+
+1. Clone this repository and enter its root directory.
+2. Run `./migrate-to-bun-uv.sh`.
+3. Copy `docker/.env.example` to `docker/.env` and configure it.
+4. Build and start the services:
+
+    ```bash
+    docker compose -f docker/docker-compose-queue-source.yml up -d --build
+    ```
+
+5. Open [http://localhost:3000](http://localhost:3000).
+6. Stop the services:
+
+    ```bash
+    docker compose -f docker/docker-compose-queue-source.yml stop
+    ```
+
+The simpler `docker/docker-compose.yml` pulls the upstream prebuilt image and therefore does not test this fork's Bun migration.
 
 ### Docker Image
 
-1. Build the image locally:
+This fork uses Bun for dependency installation, builds, and the application runtime. Run the migration once before building an image from a fresh checkout:
+
+```bash
+./migrate-to-bun-uv.sh
+```
+
+The migration creates `bun.lock`, updates the Docker and CI configuration, and removes the old pnpm files. If Python dependency manifests are present, it also migrates them to [uv](https://docs.astral.sh/uv/); this repository currently has no Python application dependencies.
+
+1. Build the Bun-based image locally:
 
     ```bash
     docker build --no-cache -t flowise .
@@ -85,85 +100,66 @@ Download and Install [NodeJS](https://nodejs.org/en/download) >= 20.0.0
 
 ## 👨‍💻 Developers
 
-Flowise has 3 different modules in a single mono repository.
+Flowise has multiple modules in a single monorepo.
 
--   `server`: Node backend to serve API logics
+-   `server`: Bun-powered backend for the application APIs
 -   `ui`: React frontend
 -   `components`: Third-party nodes integrations
 -   `api-documentation`: Auto-generated swagger-ui API docs from express
 
 ### Prerequisite
 
--   Install [PNPM](https://pnpm.io/installation)
-    ```bash
-    npm i -g pnpm
-    ```
+-   Install [Bun](https://bun.com/docs/installation) 1.4.0 or newer.
+-   Docker is required only when building or running the container images.
 
 ### Setup
 
 1.  Clone the repository:
 
     ```bash
-    git clone https://github.com/FlowiseAI/Flowise.git
+    git clone https://github.com/mz0in/flowisezen.git
     ```
 
 2.  Go into repository folder:
 
     ```bash
-    cd Flowise
+    cd flowisezen
     ```
 
-3.  Install all dependencies of all modules:
+3.  Convert a fresh checkout from the upstream pnpm configuration to Bun and uv where applicable:
 
     ```bash
-    pnpm install
+    ./migrate-to-bun-uv.sh
     ```
 
-4.  Build all the code:
+4.  Install all workspace dependencies from the generated lockfile:
 
     ```bash
-    pnpm build
+    bun install --frozen-lockfile
     ```
 
-    <details>
-    <summary>Exit code 134 (JavaScript heap out of memory)</summary>  
-    If you get this error when running the above `build` script, try increasing the Node.js heap size and run the script again:
+5.  Build all the code:
 
     ```bash
-    # macOS / Linux / Git Bash
-    export NODE_OPTIONS="--max-old-space-size=4096"
-
-    # Windows PowerShell
-    $env:NODE_OPTIONS="--max-old-space-size=4096"
-
-    # Windows CMD
-    set NODE_OPTIONS=--max-old-space-size=4096
+    bun run build
     ```
 
-    Then run:
+6.  Start the app with Bun as the runtime:
 
     ```bash
-    pnpm build
-    ```
-
-    </details>
-
-5.  Start the app:
-
-    ```bash
-    pnpm start
+    bun run --bun start
     ```
 
     You can now access the app on [http://localhost:3000](http://localhost:3000)
 
-6.  For development build:
+7.  For development:
 
     -   Create `.env` file and specify the `VITE_PORT` (refer to `.env.example`) in `packages/ui`
     -   Create `.env` file and specify the `PORT` (refer to `.env.example`) in `packages/server`
     -   Run:
 
         ```bash
-        pnpm dev
+        bun run --bun dev
         ```
 
     Any code changes will reload the app automatically on [http://localhost:8080](http://localhost:8080)
